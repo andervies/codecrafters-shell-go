@@ -16,21 +16,29 @@ func main() {
 	for {
 		fmt.Print("$ ")
 		text := bufio.NewReader(os.Stdin)
-		command, err := text.ReadString('\n')
+		user_input, err := text.ReadString('\n')
 
 		if err != nil {
 			fmt.Fprint(os.Stderr, "Error reading user input", err)
 			os.Exit(1)
 		}
 
-		command = strings.TrimSpace(command)
+		user_input = strings.TrimSpace(user_input)
 
-		if command == "exit" {
+		commands_and_args := strings.Fields(user_input)
+
+		command := commands_and_args[0]
+
+		arguments := commands_and_args[1:]
+
+		switch command {
+		case "exit":
 			os.Exit(0)
+		case "echo":
+			fmt.Print(strings.Join(arguments, " ") + "\n")
+		default:
+			fmt.Printf("%s: command not found \n", command)
 		}
-
-		fmt.Printf("%s: command not found \n", command)
-
 	}
 
 }
