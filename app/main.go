@@ -11,10 +11,19 @@ var _ = fmt.Print
 
 func main() {
 	// TODO: Uncomment the code below to pass the first stage
-	fmt.Print("$ ")
-	text := bufio.NewReader(os.Stdin)
-	command, _ := text.ReadString('\n')
 
-	fmt.Printf("%s: command not found", command[:len(command)-1])
+	for {
+		fmt.Print("$ ")
+		text := bufio.NewReader(os.Stdin)
+		command, err := text.ReadString('\n')
+
+		if err != nil {
+			fmt.Fprint(os.Stderr, "Error reading user input", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("%s: command not found \n", command[:len(command)-1])
+
+	}
 
 }
