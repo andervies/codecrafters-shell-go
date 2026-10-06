@@ -4,15 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
-// Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
-var _ = fmt.Print
-
 func main() {
-	// TODO: Uncomment the code below to pass the first stage
 
 	for {
 		fmt.Print("$ ")
@@ -50,37 +47,47 @@ func main() {
 			if target == "exit" || target == "echo" || target == "type" {
 				fmt.Printf("%s is a shell builtin\n", commandsAndArgs[1])
 			} else {
-				pathEnv := os.Getenv("PATH")
-				dirs := filepath.SplitList(pathEnv)
-				found := false
-
-				for _, dir := range dirs {
-
-					fullpath := filepath.Join(dir, target)
-					info, err := os.Stat(fullpath)
-
-					if err != nil {
-
-						continue
-					}
-
-					if !info.IsDir() && info.Mode()&0111 != 0 {
-						fmt.Println(target + " is " + fullpath)
-						found = true
-						break
-					}
-
-				}
-
-				if !found {
+				resultPath := findCommand(target)
+				if resultPath != "" {
+					fmt.Println(target + " is " + resultPath)
+				} else {
 					fmt.Printf("%s: not found\n", commandsAndArgs[1])
 				}
 
 			}
 		default:
-			fmt.Printf("%s: command not found \n", command)
+			resultPath := findCommand(command)
+
+			if resultPath != "" {
+				cmd := exec.Command(command, arguments...)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				cmd.Run()
+
+			} else {
+				fmt.Printf("%s: command not found \n", command)
+			}
+
 		}
 
 	}
 
+}
+
+func findCommand(target string) string {
+	pathEnv := os.Getenv("PATH")
+	dirs := filepath.SplitList(pathEnv)
+
+	for _, dir := range dirs {
+		fullpath := filepath.Join(dir, target)
+		info, err := os.Stat(fullpath)
+		if err != nil {
+			continue
+		}
+
+		if !info.IsDir() && info.Mode()&0111 != 0 {
+			return fullpath
+		}
+	}
+	return "" // If we get here, nothing was found
 }
