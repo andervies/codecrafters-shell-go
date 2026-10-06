@@ -38,13 +38,22 @@ func main() {
 			os.Exit(0)
 		case "echo":
 			fmt.Print(strings.Join(arguments, " ") + "\n")
+		case "pwd":
+			workingDir, err := os.Getwd()
+
+			if err != nil {
+				fmt.Fprint(os.Stderr, "Error reading current dir", err)
+				os.Exit(1)
+			} else {
+				fmt.Println(workingDir)
+			}
 		case "type":
 			if len(arguments) == 0 {
 				fmt.Println("type: missing operand")
 				continue
 			}
 			target := arguments[0]
-			if target == "exit" || target == "echo" || target == "type" {
+			if target == "exit" || target == "echo" || target == "type" || target == "pwd" {
 				fmt.Printf("%s is a shell builtin\n", commandsAndArgs[1])
 			} else {
 				resultPath := findCommand(target)
