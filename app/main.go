@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,12 +10,60 @@ import (
 	"strings"
 )
 
-func main() {
+var builtIns map[string]func(args ...string)
 
+func main() {
+	builtIns = map[string]func(args ...string){
+		"exit": func(args ...string) { os.Exit(0) },
+		"echo": func(args ...string) { fmt.Println(strings.Join(args, " ")) },
+		"pwd": func(args ...string) {
+			workingDir, err := os.Getwd()
+
+			if err != nil {
+				fmt.Fprint(os.Stderr, "Error reading current dir", err)
+				os.Exit(1)
+			} else {
+				fmt.Println(workingDir)
+			}
+		},
+		"type": func(args ...string) {
+			if len(args) == 0 {
+				fmt.Println("type: missing operand")
+				return
+			}
+			target := args[0]
+			if _, exists := builtIns[target]; exists {
+				fmt.Printf("%s is a shell builtin\n", target)
+			} else {
+				resultPath := findExecutable(target)
+				if resultPath != "" {
+					fmt.Println(target + " is " + resultPath)
+				} else {
+					fmt.Printf("%s: not found\n", target)
+				}
+
+			}
+
+		},
+
+		"cd": func(args ...string) {
+			target := args[0]
+			if strings.HasPrefix(target, "/") && len(target) != 0 {
+				if dirExists(target) {
+					os.Chdir(target)
+				} else {
+					fmt.Printf("cd: %s: No such file or directory\n", target)
+				}
+
+			}
+		},
+	}
+
+	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("$ ")
-		text := bufio.NewReader(os.Stdin)
-		userInput, err := text.ReadString('\n')
+
+		userInput, err := reader.ReadString('\n')
 
 		if err != nil {
 			fmt.Fprint(os.Stderr, "Error reading user input", err)
@@ -33,57 +82,13 @@ func main() {
 
 		arguments := commandsAndArgs[1:]
 
-		switch command {
-		case "exit":
-			os.Exit(0)
-		case "echo":
-			fmt.Print(strings.Join(arguments, " ") + "\n")
-		case "pwd":
-			workingDir, err := os.Getwd()
-
-			if err != nil {
-				fmt.Fprint(os.Stderr, "Error reading current dir", err)
-				os.Exit(1)
-			} else {
-				fmt.Println(workingDir)
-			}
-		case "type":
-			if len(arguments) == 0 {
-				fmt.Println("type: missing operand")
-				continue
-			}
-			target := arguments[0]
-			if target == "exit" || target == "echo" || target == "type" || target == "pwd" {
-				fmt.Printf("%s is a shell builtin\n", commandsAndArgs[1])
-			} else {
-				resultPath := findCommand(target)
-				if resultPath != "" {
-					fmt.Println(target + " is " + resultPath)
-				} else {
-					fmt.Printf("%s: not found\n", commandsAndArgs[1])
-				}
-
-			}
-		default:
-			resultPath := findCommand(command)
-
-			if resultPath != "" {
-				cmd := exec.Command(command, arguments...)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				cmd.Run()
-
-			} else {
-				fmt.Printf("%s: command not found \n", command)
-			}
-
-		}
+		handleCommand(command, arguments...)
 
 	}
 
 }
 
-func findCommand(target string) string {
+func findExecutable(target string) string {
 	pathEnv := os.Getenv("PATH")
 	dirs := filepath.SplitList(pathEnv)
 
@@ -99,4 +104,36 @@ func findCommand(target string) string {
 		}
 	}
 	return "" // If we get here, nothing was found
+}
+
+func handleCommand(command string, args ...string) {
+	if handler, exists := builtIns[command]; exists {
+		handler(args...)
+		return
+	}
+
+	if resultPath := findExecutable(command); resultPath != "" {
+		cmd := exec.Command(command, args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
+
+	} else {
+		fmt.Printf("%s: command not found \n", command)
+	}
+
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false
+		}
+
+		return false
+	}
+
+	return info.IsDir()
 }
