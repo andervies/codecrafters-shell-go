@@ -48,13 +48,23 @@ func main() {
 
 		"cd": func(args ...string) {
 			target := args[0]
+
 			if strings.HasPrefix(target, "/") && len(target) != 0 {
 				if dirExists(target) {
 					os.Chdir(target)
 				} else {
+
 					fmt.Printf("cd: %s: No such file or directory\n", target)
 				}
 
+			} else {
+				cleanPath := cleanFilepath(target)
+				if dirExists(cleanPath) {
+					os.Chdir(cleanPath)
+				} else {
+
+					fmt.Printf("cd: %s: No such file or directory\n", target)
+				}
 			}
 		},
 	}
@@ -136,4 +146,31 @@ func dirExists(path string) bool {
 	}
 
 	return info.IsDir()
+}
+
+func cleanFilepath(p string) string {
+	cwd, _ := os.Getwd()
+
+	for char := range strings.SplitSeq(p, "/") {
+
+		if char == ".." {
+			for i := len(cwd) - 1; i > 0; i-- {
+
+				if string(cwd[i]) == "/" {
+
+					cwd = cwd[:i]
+					break
+				}
+
+			}
+		} else if char == "." {
+			continue
+
+		} else {
+			cwd += "/" + char
+		}
+	}
+
+	return cwd
+
 }
