@@ -2,13 +2,27 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+type TokenType int
+
+const (
+	TokenError TokenType = iota
+	TokenCommand
+	TokenArgument
+	// TokenPipe
+	// TokenRedirect
+)
+
+type Token struct {
+	Type  TokenType
+	Value string
+}
 
 var builtIns map[string]func(args ...string)
 
@@ -27,6 +41,7 @@ func main() {
 			}
 		},
 		"type": func(args ...string) {
+
 			if len(args) == 0 {
 				fmt.Println("type: missing operand")
 				return
@@ -43,7 +58,6 @@ func main() {
 				}
 
 			}
-
 		},
 
 		"cd": func(args ...string) {
@@ -61,7 +75,7 @@ func main() {
 				target = cleanFilepath(target)
 			}
 
-			if err := os.Chdir(target); !dirExists(target) && err != nil {
+			if err := os.Chdir(target); err != nil {
 				fmt.Printf("cd: %s: No such file or directory\n", target)
 
 			}
@@ -81,20 +95,17 @@ func main() {
 
 		userInput = strings.TrimSpace(userInput)
 
-		commandsAndArgs := strings.Fields(userInput)
-
-		if len(commandsAndArgs) == 0 {
+		tokens, err := Tokenize(userInput)
+		if err != nil {
+			fmt.Println(err)
 			continue
 		}
 
-		command := commandsAndArgs[0]
-
-		arguments := commandsAndArgs[1:]
+		command, arguments := ExtractCommands(tokens)
 
 		handleCommand(command, arguments...)
 
 	}
-
 }
 
 func findExecutable(target string) string {
@@ -133,20 +144,6 @@ func handleCommand(command string, args ...string) {
 
 }
 
-func dirExists(path string) bool {
-	info, err := os.Stat(path)
-
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return false
-		}
-
-		return false
-	}
-
-	return info.IsDir()
-}
-
 func cleanFilepath(p string) string {
 
 	if strings.HasPrefix(p, "/") && len(p) != 0 {
@@ -176,4 +173,92 @@ func cleanFilepath(p string) string {
 
 	return cwd
 
+}
+
+func Tokenize(input string) ([]Token, error) {
+
+	var tokens []Token
+	var buf strings.Builder
+
+	inSingleQuotes := false
+	inDoubleQuotes := false
+	// var quoteChar rune
+
+	runes := []rune(input)
+
+	for _, ch := range runes {
+
+		if inSingleQuotes {
+			if ch == '\'' {
+				inSingleQuotes = false
+			} else {
+				buf.WriteRune(ch)
+			}
+		} else if inDoubleQuotes {
+			if ch == '"' {
+				inDoubleQuotes = false
+			} else {
+				buf.WriteRune(ch)
+			}
+		} else {
+			switch ch {
+			case '\'':
+				inSingleQuotes = true
+
+			case '"':
+				inDoubleQuotes = true
+
+			case ' ':
+				if buf.Len() > 0 {
+					tokens = append(tokens, createToken(buf.String(), tokens))
+					buf.Reset()
+				}
+
+			// Add pipe case in future
+
+			default:
+				buf.WriteRune(ch)
+
+			}
+		}
+	}
+
+	if inSingleQuotes || inDoubleQuotes {
+		return nil, fmt.Errorf("unclosed quote error")
+	}
+
+	if buf.Len() > 0 {
+		tokens = append(tokens, createToken(buf.String(), tokens))
+	}
+
+	return tokens, nil
+}
+
+func createToken(value string, existingToken []Token) Token {
+
+	// Add pipe check in the future
+	if len(existingToken) == 0 {
+		return Token{Type: TokenCommand, Value: value}
+
+	}
+
+	return Token{Type: TokenArgument, Value: value}
+}
+
+func ExtractCommands(tokens []Token) (string, []string) {
+	var command string
+	var args []string
+
+	for _, token := range tokens {
+		switch token.Type {
+		case TokenCommand:
+			command = token.Value
+
+		case TokenArgument:
+			args = append(args, token.Value)
+
+		}
+	}
+
+	return command, args
 }
