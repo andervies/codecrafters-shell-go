@@ -196,8 +196,20 @@ func Tokenize(input string) ([]Token, error) {
 				buf.WriteRune(ch)
 			}
 		} else if inDoubleQuotes {
-			if ch == '"' {
+			if escapeNext {
+				switch ch {
+				case '"':
+					buf.WriteRune(ch)
+					escapeNext = false
+				case '\\':
+					buf.WriteRune(ch)
+					escapeNext = false
+				}
+			} else if ch == '"' {
 				inDoubleQuotes = false
+
+			} else if ch == '\\' {
+				escapeNext = true
 			} else {
 				buf.WriteRune(ch)
 			}
@@ -231,6 +243,7 @@ func Tokenize(input string) ([]Token, error) {
 	}
 
 	if inSingleQuotes || inDoubleQuotes {
+
 		return nil, fmt.Errorf("unclosed quote error")
 	}
 
