@@ -182,6 +182,7 @@ func Tokenize(input string) ([]Token, error) {
 
 	inSingleQuotes := false
 	inDoubleQuotes := false
+	escapeNext := false
 	// var quoteChar rune
 
 	runes := []rune(input)
@@ -200,6 +201,9 @@ func Tokenize(input string) ([]Token, error) {
 			} else {
 				buf.WriteRune(ch)
 			}
+		} else if escapeNext {
+			buf.WriteRune(ch)
+			escapeNext = false
 		} else {
 			switch ch {
 			case '\'':
@@ -213,6 +217,9 @@ func Tokenize(input string) ([]Token, error) {
 					tokens = append(tokens, createToken(buf.String(), tokens))
 					buf.Reset()
 				}
+
+			case '\\':
+				escapeNext = true
 
 			// Add pipe case in future
 
