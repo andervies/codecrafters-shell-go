@@ -285,6 +285,10 @@ func ExtractCommands(tokens []Token) (string, []string) {
 
 func parseRedirection(userInput string) (commandStr string, outputFile string) {
 	if strings.Contains(userInput, ">") {
-		parts := strings.SplitN()
+		parts := strings.SplitN(userInput, ">", 2)
+
+		return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
 	}
+
+	return userInput, ""
 }
